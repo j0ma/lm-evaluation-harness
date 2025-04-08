@@ -42,15 +42,15 @@ class FLORESTask(ConfigurableTask):
         assert "target_language_code" in config, (
             "FLORESTask must have a 'target_language_code' defined"
         )
-        self.source_language_code = config["source_language_code"]
+        self.source_language_code = config.pop("source_language_code")
         self.source_language = code_to_language_name(self.source_language_code)
-        self.target_language_code = config["target_language_code"]
+        self.target_language_code = config.pop("target_language_code")
         self.target_language = code_to_language_name(self.target_language_code)
 
         super().__init__(
             config={
                 "metadata": {"version": self.VERSION},
-                "dataset_name": "facebook/flores",
+                "dataset_name": self.DATASET_NAME,
             }
         )
 
@@ -59,10 +59,10 @@ class FLORESTask(ConfigurableTask):
             self.DATASET_NAME,
             f"{self.source_language_code}-{self.target_language_code}",
         )
-        downloaded_dataset.rename_column(
+        downloaded_dataset = downloaded_dataset.rename_column(
             f"sentence_{self.source_language_code}", "source_sentence"
         )
-        downloaded_dataset.rename_column(
+        downloaded_dataset = downloaded_dataset.rename_column(
             f"sentence_{self.target_language_code}", "target_sentence"
         )
 
@@ -84,7 +84,14 @@ class FLORESTask(ConfigurableTask):
         return self.dataset["devtest"]
 
     def doc_to_text(self, doc):
-        return doc["source_sentence"]
+        return '''
+{src_lang_long} sentence: {src_sent}
+
+{tgt_lang_long} sentence: '''.format(
+            src_lang_long=self.source_language,
+            src_sent=doc['source_sentence'],
+            tgt_lang_long=self.target_language
+        )
 
     def should_decontaminate(self):
         return False
@@ -94,13 +101,6 @@ class FLORESTask(ConfigurableTask):
 
     def get_arguments(self, doc, ctx):
         return (ctx, {"until": ["\n"]})
-
-    def fewshot_context(
-        self,
-        doc: str,
-    ) -> str:
-        source = self.doc_to_text(doc)
-        return source
 
     def construct_requests(self, doc, ctx, **kwargs):
         """Uses RequestFactory to construct Requests and returns an iterable of
@@ -135,12 +135,6 @@ class FLORESTask(ConfigurableTask):
             The results of the requests created in construct_requests.
         """
         return doc
-        # source_key = f"sentence_{self.source_language}"
-        # target_key = f"sentence_{self.target_language}"
-        # doc["source_sentence"] = doc[source_key]
-        # doc["target_sentence"] = doc[target_key]
-        #
-        # return doc
 
     def process_results(self, doc, results):
         """Take a single document and the LM results and evaluates, returning a
