@@ -2,9 +2,5 @@
 include: _flores_common_yaml
 task: flores-doc-config-debug
 class: !function task.FLORESTask
-doc_to_text: 'German sentence: {{source}}
-
-  English sentence:'
-doc_to_target: '{{target}}'
 source_language_code: 'deu_Latn'
 target_language_code: 'eng_Latn'
