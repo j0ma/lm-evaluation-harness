@@ -706,9 +706,6 @@ class ConfigurableTask(Task):
 
         # Use new configurations if there was no preconfiguration
         if self.config is None:
-            # TODO: remove
-            import pudb
-            pudb.set_trace()
             self._config = TaskConfig(**config)
         # Overwrite configs
         else:
