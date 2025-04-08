@@ -35,8 +35,9 @@ run_flores () {
             --device ${gpu} \
             --model_args "pretrained=${model},trust_remote_code=True" \
             --gen_kwargs 'do_sample=True,temperature=1.0' \
-            --tasks flores_en-de-comet \
+            --tasks custom-flores_en-es \
             --batch_size 256 \
+            --limit 10 \
             --log_samples \
             --output ${seed_output_folder} \
             --verbosity DEBUG \
@@ -46,4 +47,4 @@ run_flores () {
 
 export -f run_flores
 
-run_flores 'Unbabel/TowerInstruct-Mistral-7B-v0.2' ${device_to_use} ./results/COMETDEBUG-mt-results-and-outputs-apr2024 1 1
+run_flores 'Unbabel/TowerInstruct-Mistral-7B-v0.2' ${device_to_use} ./results/customtaskdebug-mt-results-and-outputs-apr2024 1 1

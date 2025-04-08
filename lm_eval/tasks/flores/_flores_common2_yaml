@@ -3,7 +3,7 @@ dataset_path: facebook/flores
 dataset_name: all
 output_type: generate_until
 #! The test split of flores is not publicly available! (See paper section 6.1)
-training_split: dev
+class: !function task.FLORESTask
 validation_split: dev
 test_split: devtest
 fewshot_split: dev
@@ -20,10 +20,5 @@ metric_list:
   - metric: chrf
     aggregation: chrf
     higher_is_better: true
-
-metadata:
-  version: 2.0
-  inherit_metrics: false
-
 dataset_kwargs:
   trust_remote_code: true
