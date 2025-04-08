@@ -6,3 +6,6 @@ doc_to_text: 'German sentence: {{sentence_deu_Latn}}
 
   English sentence:'
 doc_to_target: '{{sentence_eng_Latn}}'
+metadata:
+  source_lang: 'deu_Latn'
+  target_lang: 'eng_Latn'
