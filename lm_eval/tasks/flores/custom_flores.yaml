@@ -1,0 +1,20 @@
+group: custom_flores
+task:
+  - custom-flores_de-en
+  - custom-flores_en-de
+  - custom-flores_en-es
+  - custom-flores_en-fr
+  - custom-flores_en-it
+  - custom-flores_en-ko
+  - custom-flores_en-nl
+  - custom-flores_en-pt
+  - custom-flores_en-ru
+  - custom-flores_es-en
+  - custom-flores_fr-en
+  - custom-flores_it-en
+  - custom-flores_ko-en
+  - custom-flores_nl-en
+  - custom-flores_pt-en
+  - custom-flores_ru-en
+metadata:
+  version: 2.0
