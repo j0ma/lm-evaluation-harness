@@ -30,7 +30,7 @@ run_flores () {
             --device ${gpu} \
             --model_args "pretrained=${model},trust_remote_code=True" \
             --gen_kwargs 'do_sample=True,temperature=1.0' \
-            --tasks flores_ntrex_flores \
+            --tasks custom_flores \
             --batch_size 256 \
             --log_samples \
             --output ${seed_output_folder} \
@@ -40,12 +40,10 @@ run_flores () {
 
 export -f run_flores
 
-#run_flores 'Unbabel/TowerInstruct-Mistral-7B-v0.2' 'cuda:0' ./results/mt-results-and-outputs-apr2024 5 5  &
-#run_flores 'CohereForAI/aya-expanse-8b' 'cuda:1' ./results/mt-results-and-outputs-apr2024 5 5  &
+run_flores 'Unbabel/TowerInstruct-Mistral-7B-v0.2' 'cuda:1' ./results/custom-flores-results-and-outputs-apr2024 1 5  &
+run_flores 'CohereForAI/aya-expanse-8b' 'cuda:5' ./results/custom-flores-results-and-outputs-apr2024 1 5  &
 
-#wait
-
-run_flores 'Unbabel/TowerInstruct-Mistral-7B-v0.2' 'cuda:0' ./results/mt-results-and-outputs-apr2024 4 4
+wait
 
 #parallel --dry-run --link --jobs 2 \
     #'run_flores {1} {2} ./results/mt-results-and-outputs-apr2024 1 1' \

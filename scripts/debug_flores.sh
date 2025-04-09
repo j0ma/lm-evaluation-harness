@@ -14,6 +14,7 @@ run_flores () {
 
     model_for_log=$(echo $model | sed 's/\//_/')
 
+    echo $task_to_run
     echo $model
     echo $gpu
     echo $log_output_folder
@@ -48,4 +49,4 @@ run_flores () {
 
 export -f run_flores
 
-run_flores 'Unbabel/TowerInstruct-Mistral-7B-v0.2' ${device_to_use} ./results/taskgroupdebug-mt-results-and-outputs-apr2024 1 1
+run_flores 'CohereForAI/aya-expanse-8b' ${device_to_use} ./results/ayadebug-mt-results-and-outputs-apr2024 1 1
