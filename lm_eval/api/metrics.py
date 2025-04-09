@@ -8,6 +8,7 @@ from typing import List
 
 import numpy as np
 import sacrebleu
+from evaluate import load
 
 from lm_eval.api.registry import register_aggregation, register_metric
 
@@ -67,6 +68,7 @@ def matthews_corrcoef(items):
     unzipped_list = list(zip(*items))
     golds = unzipped_list[0]
     preds = unzipped_list[1]
+
     return matthews_corrcoef(golds, preds)
 
 
@@ -85,6 +87,7 @@ def bleu(items):
     refs = list(zip(*items))[0]
     preds = list(zip(*items))[1]
     refs, preds = _sacreformat(refs, preds)
+
     return sacrebleu.corpus_bleu(preds, refs).score
 
 
@@ -100,7 +103,54 @@ def chrf(items):
     refs = list(zip(*items))[0]
     preds = list(zip(*items))[1]
     refs, preds = _sacreformat(refs, preds)
+
     return sacrebleu.corpus_chrf(preds, refs).score
+
+@register_aggregation("comet")
+def comet(items):
+    """
+    COMET
+    """
+    sources = list(zip(*items))[0]
+    refs = list(zip(*items))[1]
+    hyps = list(zip(*items))[2]
+   
+    comet_metric = load("comet")
+    overall_score = 100*comet_metric.compute(
+        predictions=hyps,
+        references=refs,
+        sources=sources
+    )['mean_score']
+
+    return overall_score
+
+def comet_stderr(items, iters):
+    """
+    COMET standard error
+    """
+    sources = list(zip(*items))[0]
+    refs = list(zip(*items))[1]
+    hyps = list(zip(*items))[2]
+   
+    comet_metric = load("comet")
+    scores = comet_metric.compute(
+        predictions=hyps,
+        references=refs,
+        sources=sources
+    )['scores']
+    scores = [100*s for s in scores]
+
+    # Bootstrap
+    n = len(scores)
+    bootstrap_means = [
+        np.mean(np.random.choice(scores, n, replace=True))
+
+        for _ in range(iters)
+    ]
+
+    standard_error = np.std(bootstrap_means, ddof=1)
+
+    return standard_error
 
 
 @register_aggregation("ter")
@@ -113,10 +163,12 @@ def ter(items):
 
     Lower is better
     """
+
     return 1.0
     refs = list(zip(*items))[0]
     preds = list(zip(*items))[1]
     refs, preds = _sacreformat(refs, preds)
+
     return sacrebleu.corpus_ter(preds, refs).score
 
 
@@ -127,6 +179,7 @@ def brier_score(items):  # This is a passthrough function
 
     gold = list(gold)
     gold_one_hot = np.eye(num_class)[gold]
+
     return np.mean(np.sum((predictions - gold_one_hot) ** 2, axis=1))
 
 
@@ -278,11 +331,13 @@ def bits_per_byte_fn(items):  # This is a passthrough function
 
 def pop_stddev(arr):
     mu = mean(arr)
+
     return math.sqrt(sum([(x - mu) ** 2 for x in arr]) / len(arr))
 
 
 def sample_stddev(arr):
     mu = mean(arr)
+
     return math.sqrt(sum([(x - mu) ** 2 for x in arr]) / (len(arr) - 1))
 
 
@@ -365,6 +420,7 @@ def acc_all(items):
     for doc, pred in zip(docs, preds):
         paragraph_id = doc["idx"]["paragraph"]
         question_id = doc["idx"]["question"]
+
         if (paragraph_id, question_id) not in question_scoring_dict:
             question_scoring_dict[(paragraph_id, question_id)] = []
 
@@ -372,6 +428,7 @@ def acc_all(items):
 
         question_scoring_dict[(paragraph_id, question_id)].append(gold_label == pred)
     acc = np.mean([int(all(x)) for x in question_scoring_dict.values()])
+
     return acc
 
 
@@ -383,6 +440,7 @@ def acc_all_stderr(items):
 
     for doc, pred in zip(docs, preds):
         question_id = doc["idx"]["question"]
+
         if question_id not in question_scoring_dict:
             question_scoring_dict[question_id] = []
 
@@ -390,20 +448,24 @@ def acc_all_stderr(items):
         question_scoring_dict[question_id].append(gold_label == pred)
 
     acc = mean_stderr([int(all(x)) for x in question_scoring_dict.values()])
+
     return acc
 
 
 def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
     """Compute max metric between prediction and each ground truth."""
     scores_for_ground_truths = []
+
     for ground_truth in ground_truths:
         score = metric_fn(prediction, ground_truth)
         scores_for_ground_truths.append(score)
+
     return max(scores_for_ground_truths)
 
 
 def weighted_mean(items):
     a, b = zip(*items)
+
     return sum(a) / sum(b)
 
 
@@ -422,16 +484,20 @@ def _sacreformat(refs, preds):
 
     # We expect refs to be List[str] or List[List[str]], the outer list corresponding to preds
     # Must become List[List[str]] with the inner list corresponding to preds
+
     if not is_non_str_iterable(refs):
         refs = list(refs)
+
     if not is_non_str_iterable(refs[0]):
         refs = [[ref] for ref in refs]
     refs = list(zip(*refs))
     # Note the number of refs in each ref list much match the number of preds
 
     # We expect preds to be List[str] or List[List[str]]. Must become List[str]
+
     if not is_non_str_iterable(preds):
         preds = list(preds)
+
     if is_non_str_iterable(preds[0]):
         assert len(preds[0]) == 1, f"Pred must be a str, was {preds[0]}"
         preds = [pred[0] for pred in preds]
@@ -452,8 +518,10 @@ class _bootstrap_internal:
         rnd = random.Random()
         rnd.seed(i)
         res = []
+
         for _ in range(self.n):
             res.append(self.f(rnd.choices(xs, k=len(xs))))
+
         return res
 
 
@@ -472,6 +540,7 @@ def bootstrap_stderr(f, xs, iters):
     from tqdm import tqdm
 
     print("bootstrapping for stddev:", f.__name__)
+
     for bootstrap in tqdm(
         pool.imap(
             _bootstrap_internal(f, chunk_size),
@@ -483,12 +552,14 @@ def bootstrap_stderr(f, xs, iters):
         res.extend(bootstrap)
 
     pool.close()
+
     return sample_stddev(res)
 
 
 def stderr_for_metric(metric, bootstrap_iters: int):
     if bootstrap_iters <= 0:
         # return no function (don't compute stderr) if bootstrap iters = 0
+
         return None
 
     bootstrappable = [
@@ -498,10 +569,13 @@ def stderr_for_metric(metric, bootstrap_iters: int):
         perplexity,
         bleu,
         chrf,
-        ter,
+        # ter,
+        comet
     ]
 
-    if metric in bootstrappable:
+    if metric == comet:
+        return lambda x: comet_stderr(items=x, iters=bootstrap_iters)
+    elif metric in bootstrappable:
         return lambda x: bootstrap_stderr(metric, x, iters=bootstrap_iters)
 
     stderr = {mean: mean_stderr, acc_all: acc_all_stderr}
@@ -563,6 +637,7 @@ def aggregate_subtask_metrics(metrics, sizes, weight_by_size=True):
     # A helper function that is used to aggregate
     # subtask scores cross-task.
     # TODO: does not hold for non-mean aggregations
+
     if not weight_by_size:
         sizes = [1] * len(sizes)
 
