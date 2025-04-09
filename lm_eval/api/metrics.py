@@ -10,7 +10,7 @@ import numpy as np
 import sacrebleu
 from evaluate import load
 
-from lm_eval.api.registry import register_aggregation, register_metric
+from lm_eval.api.registry import register_aggregation, register_metric, GPU_METRIC_REGISTRY
 
 
 eval_logger = logging.getLogger("lm-eval")
@@ -115,7 +115,13 @@ def comet(items):
     refs = list(zip(*items))[1]
     hyps = list(zip(*items))[2]
    
-    comet_metric = load("comet")
+    if "comet" in GPU_METRIC_REGISTRY:
+        comet_metric = GPU_METRIC_REGISTRY["comet"]
+    else:
+        eval_logger.info("Instantiating COMET since it was not found...")
+        comet_metric = load("comet")
+        GPU_METRIC_REGISTRY['comet'] = comet_metric
+        
     overall_score = 100*comet_metric.compute(
         predictions=hyps,
         references=refs,
@@ -132,7 +138,13 @@ def comet_stderr(items, iters):
     refs = list(zip(*items))[1]
     hyps = list(zip(*items))[2]
    
-    comet_metric = load("comet")
+    if "comet" in GPU_METRIC_REGISTRY:
+        comet_metric = GPU_METRIC_REGISTRY["comet"]
+    else:
+        eval_logger.info("Instantiating COMET since it was not found...")
+        comet_metric = load("comet")
+        GPU_METRIC_REGISTRY['comet'] = comet_metric
+
     scores = comet_metric.compute(
         predictions=hyps,
         references=refs,

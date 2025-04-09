@@ -10,6 +10,9 @@ eval_logger = logging.getLogger("lm-eval")
 
 MODEL_REGISTRY = {}
 
+# Registry for metrics like COMET
+GPU_METRIC_REGISTRY = {}
+
 
 def register_model(*names):
     # either pass a list or a single alias.
