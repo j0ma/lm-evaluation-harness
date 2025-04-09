@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-device_to_use=${1}
+export device_to_use=${1}
+export task_to_run=${task_to_run:-"custom-flores_en-es"}
 
 [ $# -lt 1 ] && echo "Too few arguments! Must give device" && exit
 
@@ -35,7 +36,7 @@ run_flores () {
             --device ${gpu} \
             --model_args "pretrained=${model},trust_remote_code=True" \
             --gen_kwargs 'do_sample=True,temperature=1.0' \
-            --tasks custom-flores_en-es \
+            --tasks ${task_to_run} \
             --batch_size 256 \
             --limit 10 \
             --log_samples \
@@ -47,4 +48,4 @@ run_flores () {
 
 export -f run_flores
 
-run_flores 'Unbabel/TowerInstruct-Mistral-7B-v0.2' ${device_to_use} ./results/customtaskdebug-mt-results-and-outputs-apr2024 1 1
+run_flores 'Unbabel/TowerInstruct-Mistral-7B-v0.2' ${device_to_use} ./results/taskgroupdebug-mt-results-and-outputs-apr2024 1 1
