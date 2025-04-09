@@ -14,6 +14,7 @@ from langcodes import Language
 
 from lm_eval.api.instance import Instance
 from lm_eval.api.task import ConfigurableTask
+from lm_eval.api.task import get_metric, get_aggregation
 
 
 _CITATION = """
@@ -35,7 +36,6 @@ class FLORESTask(ConfigurableTask):
     ) -> None:
         if config is None:
             config = {}
-        # assert "recipe" in config, "Unitxt task must have a 'recipe' string."
         assert "source_language_code" in config, (
             "FLORESTask must have a 'source_language_code' defined"
         )
@@ -51,7 +51,6 @@ class FLORESTask(ConfigurableTask):
             config={
                 "metadata": {"version": self.VERSION},
                 "dataset_name": self.DATASET_NAME,
-                "metric_list": config['metric_list']
             }
         )
 
@@ -103,3 +102,38 @@ class FLORESTask(ConfigurableTask):
 
     def doc_to_target(self, doc):
         return doc["target_sentence"]
+
+    def process_results(self, doc, results):
+        """Take a single document and the LM results and evaluates, returning a
+        dict where keys are the names of submetrics and values are the values of
+        the metric for that one document
+
+        :param doc:
+            The document as returned from training_docs, validation_docs, or test_docs.
+        :param results:
+            The results of the requests created in construct_requests.
+        """
+        hypothesis_sentence = results[0]
+        source_sentence = doc['source_sentence']
+        reference_sentence = doc['target_sentence']
+
+        return {
+            "bleu": (reference_sentence, hypothesis_sentence),
+            "chrf": (reference_sentence, hypothesis_sentence),
+            "comet": (source_sentence, reference_sentence, hypothesis_sentence)
+        }
+
+
+    def aggregation(self):
+        """
+        :returns: {str: [float] -> float}
+            A dictionary where keys are the names of submetrics and values are
+            functions that aggregate a list of metrics
+        """
+
+        return {
+            "bleu": get_aggregation("bleu"),
+            "chrf": get_aggregation("chrf"),
+            "comet": get_aggregation("comet")
+        }
+
