@@ -1,0 +1,20 @@
+group: in-context-examples
+task:
+  - in-context-examples_de-en
+  - in-context-examples_en-de
+  - in-context-examples_en-es
+  - in-context-examples_en-fr
+  - in-context-examples_en-it
+  - in-context-examples_en-ko
+  - in-context-examples_en-nl
+  - in-context-examples_en-pt
+  - in-context-examples_en-ru
+  - in-context-examples_es-en
+  - in-context-examples_fr-en
+  - in-context-examples_it-en
+  - in-context-examples_ko-en
+  - in-context-examples_nl-en
+  - in-context-examples_pt-en
+  - in-context-examples_ru-en
+metadata:
+  version: 2.0
