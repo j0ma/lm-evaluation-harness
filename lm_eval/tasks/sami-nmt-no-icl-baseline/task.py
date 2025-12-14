@@ -1,72 +1,29 @@
-"""
-Abstract: We consider a low-resource translation task from Finnish into Northern Sámi. Collecting all available parallel data between the languages, we obtain around 30,000 sentence pairs. However, there exists a significantly larger monolingual Northern Sámi corpus, as well as a rule-based machine translation (RBMT) system between the languages. To make the best use of the monolingual data in a neural machine translation (NMT) system, we use the backtranslation approach to create synthetic parallel data from it using both NMT and RBMT systems. Evaluating the results on an in-domain test set and a small out-of-domain set, we find that the RBMT backtranslation outperforms NMT backtranslation clearly for the out-of-domain test set, but also slightly for the in-domain data, for which the NMT backtranslation model provided clearly better BLEU scores than the RBMT. In addition, combining both backtranslated data sets improves the RBMT approach only for the in-domain test set. This suggests that the RBMT system provides general-domain knowledge that cannot be found from the relative small parallel training data.
-"""
-
-import importlib.util
-import re
-from collections.abc import Callable
-from functools import partial
-from typing import Any, Dict, Optional
-
 import datasets
-import numpy as np
-from langcodes import Language
+from lm_eval.api.task import Task
+from lm_eval.api.registry import register_task
+from lm_eval.api.metric import mean, make_bleu_metric
 
-from lm_eval.api.instance import Instance
-from lm_eval.api.task import ConfigurableTask
-from lm_eval.api.task import get_metric, get_aggregation
-
-
-_CITATION = """
-Mikko Aulamo, Sami Virpioja, Yves Scherrer, and Jörg Tiedemann. 2021. Boosting Neural Machine Translation from Finnish to Northern Sámi with Rule-Based Backtranslation. In Proceedings of the 23rd Nordic Conference on Computational Linguistics (NoDaLiDa), pages 351–356, Reykjavik, Iceland (Online). Linköping University Electronic Press, Sweden.
-"""
+# Define a custom BLEU metric function if not using the default registry one
+# (Standard harness usually has "bleu", but it's safer to import explicitly if unsure)
 
 
-def code_to_language_name(lang_code):
-    return Language.make(language=Language.get(lang_code)["language"]).display_name()
-
-
-class SamiNMTTask(ConfigurableTask):
+@register_task("sami_nmt")
+class SamiNMTTask(Task):
     VERSION = 0
-    DATASET_NAME = "j0ma/sami-mt-data"
+    DATASET_PATH = "j0ma/sami-mt-data"
+    DATASET_NAME = "default"
 
-    def __init__(
-        self,
-        config: Optional[dict] = None,
-    ) -> None:
-        if config is None:
-            config = {}
-        assert "source_language_code" in config, (
-            "SamiNMTTask must have a 'source_language_code' defined"
+    def __init__(self, config=None):
+        super().__init__(config=config)
+        # Default config if none provided via command line
+        self.src_lang = "fi"
+        self.tgt_lang = "se"
+
+        # KEY CHANGE: Support different prompt styles for MADLAD vs Chat models
+        # Passed via --task_args prompt_style=madlad
+        self.prompt_style = (
+            config.get("prompt_style", "default") if config else "default"
         )
-        assert "target_language_code" in config, (
-            "SamiNMTTask must have a 'target_language_code' defined"
-        )
-        self.source_language_code = config.pop("source_language_code")
-        self.source_language = code_to_language_name(self.source_language_code)
-        self.target_language_code = config.pop("target_language_code")
-        self.target_language = code_to_language_name(self.target_language_code)
-
-        super().__init__(
-            config={
-                "metadata": {"version": self.VERSION},
-                "dataset_name": self.DATASET_NAME,
-            }
-        )
-
-    def download(self, dataset_kwargs: Optional[Dict[str, Any]] = None) -> None:
-        downloaded_dataset = datasets.load_dataset(
-            path=self.DATASET_NAME, name="default", cache_dir=None
-        )
-
-        def add_src_tgt_cols(example):
-            example["source_sentence"] = example[self.source_language_code]
-            example["target_sentence"] = example[self.target_language_code]
-            return example
-
-        downloaded_dataset = downloaded_dataset.map(add_src_tgt_cols)
-
-        self.dataset = downloaded_dataset
 
     def has_training_docs(self):
         return False
@@ -77,56 +34,58 @@ class SamiNMTTask(ConfigurableTask):
     def has_test_docs(self):
         return True
 
+    def training_docs(self):
+        return []
+
+    def validation_docs(self):
+        return []
+
     def test_docs(self):
+        # map() is handled automatically by the harness if using DATASET_PATH
+        # but since we need to rename columns to a standard format, we do it here
         return self.dataset["test"]
 
     def doc_to_text(self, doc):
-        out = """
-{src_lang_long} sentence: {src_sent}
+        src_text = doc[self.src_lang]
 
-{tgt_lang_long} sentence: """.format(
-            src_lang_long=self.source_language,
-            src_sent=doc["source_sentence"],
-            tgt_lang_long=self.target_language,
-        )
+        # MADLAD-400 Format (Critical for performance)
+        if self.prompt_style == "madlad":
+            # <2se> is the token for Northern Sami in MADLAD
+            return f"<2{self.tgt_lang}> {src_text}"
 
-        return out
+        # Aya 101 / T5 Format (Instruction style)
+        elif self.prompt_style == "aya":
+            return f"Translate to Northern Sami: {src_text}"
 
-    def should_decontaminate(self):
-        return False
+        # Default / Decoder-Only (NorMistral/Llama)
+        # Uses standard Few-Shot / Completion format
+        else:
+            return f"Finnish: {src_text}\nNorthern Sami:"
 
     def doc_to_target(self, doc):
-        return doc["target_sentence"]
+        # For Encoder-Decoder, this is just the target string.
+        # For Decoder-only, this is the completion.
+        # The harness handles the difference automatically based on model type.
+        return (
+            f" {doc[self.tgt_lang]}"
+            if self.prompt_style == "default"
+            else doc[self.tgt_lang]
+        )
 
     def process_results(self, doc, results):
-        """Take a single document and the LM results and evaluates, returning a
-        dict where keys are the names of submetrics and values are the values of
-        the metric for that one document
-
-        :param doc:
-            The document as returned from training_docs, validation_docs, or test_docs.
-        :param results:
-            The results of the requests created in construct_requests.
-        """
-        hypothesis_sentence = results[0]
-        source_sentence = doc["source_sentence"]
-        reference_sentence = doc["target_sentence"]
+        # The 'results' argument contains the generated strings
+        prediction = results[0]
+        reference = doc[self.tgt_lang]
 
         return {
-            "bleu": (reference_sentence, hypothesis_sentence),
-            "chrf": (reference_sentence, hypothesis_sentence),
-            # "comet": (source_sentence, reference_sentence, hypothesis_sentence),
+            "bleu": (reference, prediction),
+            "chrf": (reference, prediction),
         }
 
     def aggregation(self):
-        """
-        :returns: {str: [float] -> float}
-            A dictionary where keys are the names of submetrics and values are
-            functions that aggregate a list of metrics
-        """
+        from lm_eval.metrics import bleu, chrf
 
         return {
-            "bleu": get_aggregation("bleu"),
-            "chrf": get_aggregation("chrf"),
-            # "comet": get_aggregation("comet"),
+            "bleu": bleu,  # Uses built-in harness metrics
+            "chrf": chrf,
         }

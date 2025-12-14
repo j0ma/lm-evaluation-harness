@@ -1,4 +1,4 @@
-tag: sami-yle-test
+tag: sami-nmt
 output_type: generate_until
 class: !function task.SamiNMTTask
 test_split: test
