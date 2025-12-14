@@ -1,33 +1,73 @@
 """
+Sami NMT (Neural Machine Translation) Task for LM Evaluation Harness.
+Supports multiple prompt styles for different model families (MADLAD, Aya, decoder-only models).
+
 Abstract: We consider a low-resource translation task from Finnish into Northern Sámi. Collecting all available parallel data between the languages, we obtain around 30,000 sentence pairs. However, there exists a significantly larger monolingual Northern Sámi corpus, as well as a rule-based machine translation (RBMT) system between the languages. To make the best use of the monolingual data in a neural machine translation (NMT) system, we use the backtranslation approach to create synthetic parallel data from it using both NMT and RBMT systems. Evaluating the results on an in-domain test set and a small out-of-domain set, we find that the RBMT backtranslation outperforms NMT backtranslation clearly for the out-of-domain test set, but also slightly for the in-domain data, for which the NMT backtranslation model provided clearly better BLEU scores than the RBMT. In addition, combining both backtranslated data sets improves the RBMT approach only for the in-domain test set. This suggests that the RBMT system provides general-domain knowledge that cannot be found from the relative small parallel training data.
 """
 
+from typing import Any, Dict, Optional
+
 import datasets
 from langcodes import Language
+
+from lm_eval.api.task import ConfigurableTask, get_aggregation
 
 _CITATION = """
 Mikko Aulamo, Sami Virpioja, Yves Scherrer, and Jörg Tiedemann. 2021. Boosting Neural Machine Translation from Finnish to Northern Sámi with Rule-Based Backtranslation. In Proceedings of the 23rd Nordic Conference on Computational Linguistics (NoDaLiDa), pages 351–356, Reykjavik, Iceland (Online). Linköping University Electronic Press, Sweden.
 """
 
-def code_to_language_name(lang_code):
+
+def code_to_language_name(lang_code: str):
     return Language.make(language=Language.get(lang_code)["language"]).display_name()
+
 
 class SamiNMTTask(ConfigurableTask):
     VERSION = 0
-    DATASET_PATH = "j0ma/sami-mt-data"
-    DATASET_NAME = "default"
+    DATASET_NAME = "j0ma/sami-mt-data"
 
-    def __init__(self, config):
-        super().__init__(config=config)
-        # Default config if none provided via command line
-        # self.src_lang = "sme"
-        # self.tgt_lang = "fin"
+    def __init__(
+        self,
+        config: Optional[dict] = None,
+    ) -> None:
+        if config is None:
+            config = {}
+        
+        # Required config fields
+        assert "source_language_code" in config, (
+            "SamiNMTTask must have a 'source_language_code' defined"
+        )
+        assert "target_language_code" in config, (
+            "SamiNMTTask must have a 'target_language_code' defined"
+        )
+        
+        # Extract and pop language codes
+        self.source_language_code = config.pop("source_language_code")
+        self.source_language = code_to_language_name(self.source_language_code)
+        self.target_language_code = config.pop("target_language_code")
+        self.target_language = code_to_language_name(self.target_language_code)
+        
+        # Prompt style for different model families (default: "default" for decoder-only)
+        self.prompt_style = config.pop("prompt_style", "default")
+        
+        # Optional: corpus specification (uit, yle, etc.)
+        self.corpus = config.pop("corpus", None)
 
+        super().__init__(
+            config={
+                "metadata": {"version": self.VERSION},
+                "dataset_name": self.DATASET_NAME,
+            }
+        )
 
-        # KEY CHANGE: Support different prompt styles for MADLAD vs Chat models
-        # Passed via --task_args prompt_style=madlad
-        self.prompt_style = config.get("prompt_style", "default")
-        self.corpus = config["corpus"]
+    def download(self, dataset_kwargs: Optional[Dict[str, Any]] = None) -> None:
+        """Download and prepare the dataset."""
+        downloaded_dataset = datasets.load_dataset(
+            path=self.DATASET_NAME,
+            name="default",
+            cache_dir=None
+        )
+
+        self.dataset = downloaded_dataset
 
     def has_training_docs(self):
         return False
@@ -45,53 +85,72 @@ class SamiNMTTask(ConfigurableTask):
         return []
 
     def test_docs(self):
-        # map() is handled automatically by the harness if using DATASET_PATH
-        # but since we need to rename columns to a standard format, we do it here
-        return self.dataset["test"]
+        # Get the test split for the appropriate corpus
+        return self.dataset[f"{self.corpus}_test"]
 
     def doc_to_text(self, doc):
-        src_lang_field = f"text_{self.src_lang}"
-        src_text = doc[src_lang_field]
+        """Format the source sentence for the model input.
+        
+        Different prompt styles for different model families:
+        - "madlad": Uses <2{lang_code}> token for MADLAD-style encoder-decoder models
+        - "aya": Uses natural language instruction for Aya-style models
+        - "default": Uses completion-style prompts for decoder-only models (NorMistral, Llama)
+        """
+        src_field = f"text_{self.source_language_code}"
+        src_text = doc[src_field]
 
-        # MADLAD-400 Format (Critical for performance)
         if self.prompt_style == "madlad":
-            # <2se> is the token for Northern Sami in MADLAD
-            return f"<2{self.tgt_lang}> {src_text}"
+            # MADLAD-400 format: <2se> for Northern Sami, <2fi> for Finnish, etc.
+            return f"<2{self.target_language_code}> {src_text}"
 
-        # Aya 101 / T5 Format (Instruction style)
         elif self.prompt_style == "aya":
-            return f"Translate to Northern Sami: {src_text}"
+            # Aya-101 format: Natural language instruction
+            return f"Translate to {self.target_language}: {src_text}"
 
-        # Default / Decoder-Only (NorMistral/Llama)
-        # Uses standard Few-Shot / Completion format
-        else:
-            return f"Finnish: {src_text}\nNorthern Sami:"
+        else:  # Default: decoder-only (completion-style)
+            # Standard format for GPT-like models
+            out = (
+                f"{self.source_language} sentence: {src_text}\n"
+                f"{self.target_language} sentence: "
+            )
+            return out
 
     def doc_to_target(self, doc):
-        # For Encoder-Decoder, this is just the target string.
-        # For Decoder-only, this is the completion.
-        # The harness handles the difference automatically based on model type.
-        tgt_lang_field = f"text_{self.tgt_lang}"
-        return (
-            f" {doc[tgt_lang_field]}"
-            if self.prompt_style == "default"
-            else doc[tgt_lang_field]
-        )
+        """Return the target sentence.
+
+        For decoder-only models, we add a leading space because the prompt
+        ends with a space and we want the model to generate the actual text.
+        For encoder-decoder models (MADLAD, Aya), the target is raw.
+        """
+        tgt_field = f"text_{self.target_language_code}"
+        tgt_text = doc[tgt_field]
+        
+        # Decoder-only models need a leading space for proper tokenization
+        if self.prompt_style == "default":
+            return f" {tgt_text}"
+        else:
+            # Encoder-decoder models (MADLAD, Aya)
+            return tgt_text
+
+    def should_decontaminate(self):
+        return False
 
     def process_results(self, doc, results):
-        # The 'results' argument contains the generated strings
-        prediction = results[0]
-        reference = doc[self.tgt_lang]
+        """Evaluate the generated translation against the reference."""
+        hypothesis_sentence = results[0]
+        src_field = f"text_{self.source_language_code}"
+        tgt_field = f"text_{self.target_language_code}"
+        source_sentence = doc[src_field]
+        reference_sentence = doc[tgt_field]
 
         return {
-            "bleu": (reference, prediction),
-            "chrf": (reference, prediction),
+            "bleu": (reference_sentence, hypothesis_sentence),
+            "chrf": (reference_sentence, hypothesis_sentence),
         }
 
     def aggregation(self):
-
+        """Return aggregation functions for metrics."""
         return {
             "bleu": get_aggregation("bleu"),
             "chrf": get_aggregation("chrf"),
-            # "comet": get_aggregation("comet"),
         }
