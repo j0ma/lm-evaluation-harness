@@ -10,7 +10,6 @@ import itertools
 import yaml
 from langcodes import Language
 
-
 # utils
 flatten = lambda l: list(itertools.chain(*l))
 

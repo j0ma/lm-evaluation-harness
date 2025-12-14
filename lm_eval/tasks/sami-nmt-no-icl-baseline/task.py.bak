@@ -2,20 +2,8 @@
 Abstract: We consider a low-resource translation task from Finnish into Northern Sámi. Collecting all available parallel data between the languages, we obtain around 30,000 sentence pairs. However, there exists a significantly larger monolingual Northern Sámi corpus, as well as a rule-based machine translation (RBMT) system between the languages. To make the best use of the monolingual data in a neural machine translation (NMT) system, we use the backtranslation approach to create synthetic parallel data from it using both NMT and RBMT systems. Evaluating the results on an in-domain test set and a small out-of-domain set, we find that the RBMT backtranslation outperforms NMT backtranslation clearly for the out-of-domain test set, but also slightly for the in-domain data, for which the NMT backtranslation model provided clearly better BLEU scores than the RBMT. In addition, combining both backtranslated data sets improves the RBMT approach only for the in-domain test set. This suggests that the RBMT system provides general-domain knowledge that cannot be found from the relative small parallel training data.
 """
 
-import importlib.util
-import re
-from collections.abc import Callable
-from functools import partial
-from typing import Any, Dict, Optional
-
 import datasets
-import numpy as np
 from langcodes import Language
-
-from lm_eval.api.instance import Instance
-from lm_eval.api.task import ConfigurableTask
-from lm_eval.api.task import get_metric, get_aggregation
-
 
 _CITATION = """
 Mikko Aulamo, Sami Virpioja, Yves Scherrer, and Jörg Tiedemann. 2021. Boosting Neural Machine Translation from Finnish to Northern Sámi with Rule-Based Backtranslation. In Proceedings of the 23rd Nordic Conference on Computational Linguistics (NoDaLiDa), pages 351–356, Reykjavik, Iceland (Online). Linköping University Electronic Press, Sweden.
