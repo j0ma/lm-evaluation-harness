@@ -101,6 +101,7 @@ class SamiNMTTask(ConfigurableTask):
             return f"<2{self.target_language_code}> {src_text}"
         else:
             out = (
+                f"Translate from {self.source_language} to {self.target_language}\n"
                 f"{self.source_language} sentence: {src_text}\n"
                 f"{self.target_language} sentence: "
             )
