@@ -1,0 +1,6 @@
+group: saminmt_uit_all_default
+task:
+  - saminmt_uit_fin-sme_default
+  - saminmt_uit_sme-fin_default
+metadata:
+  version: 1.0

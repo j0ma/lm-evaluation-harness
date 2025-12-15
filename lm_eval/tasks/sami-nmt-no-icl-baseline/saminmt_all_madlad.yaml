@@ -1,0 +1,8 @@
+group: saminmt_all_madlad
+task:
+  - saminmt_yle_fin-sme_madlad
+  - saminmt_yle_sme-fin_madlad
+  - saminmt_uit_fin-sme_madlad
+  - saminmt_uit_sme-fin_madlad
+metadata:
+  version: 1.0
