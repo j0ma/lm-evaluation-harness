@@ -31,24 +31,24 @@ class SamiNMTTask(ConfigurableTask):
     ) -> None:
         if config is None:
             config = {}
-        
+
         # Required config fields
-        assert "source_language_code" in config, (
-            "SamiNMTTask must have a 'source_language_code' defined"
-        )
-        assert "target_language_code" in config, (
-            "SamiNMTTask must have a 'target_language_code' defined"
-        )
-        
+        assert (
+            "source_language_code" in config
+        ), "SamiNMTTask must have a 'source_language_code' defined"
+        assert (
+            "target_language_code" in config
+        ), "SamiNMTTask must have a 'target_language_code' defined"
+
         # Extract and pop language codes
         self.source_language_code = config.pop("source_language_code")
         self.source_language = code_to_language_name(self.source_language_code)
         self.target_language_code = config.pop("target_language_code")
         self.target_language = code_to_language_name(self.target_language_code)
-        
+
         # Prompt style for different model families (default: "default" for decoder-only)
         self.prompt_style = config.pop("prompt_style", "default")
-        
+
         # Optional: corpus specification (uit, yle, etc.)
         self.corpus = config.pop("corpus", None)
 
@@ -62,9 +62,7 @@ class SamiNMTTask(ConfigurableTask):
     def download(self, dataset_kwargs: Optional[Dict[str, Any]] = None) -> None:
         """Download and prepare the dataset."""
         downloaded_dataset = datasets.load_dataset(
-            path=self.DATASET_NAME,
-            name="default",
-            cache_dir=None
+            path=self.DATASET_NAME, name="default", cache_dir=None
         )
 
         self.dataset = downloaded_dataset
@@ -90,10 +88,9 @@ class SamiNMTTask(ConfigurableTask):
 
     def doc_to_text(self, doc):
         """Format the source sentence for the model input.
-        
+
         Different prompt styles for different model families:
         - "madlad": Uses <2{lang_code}> token for MADLAD-style encoder-decoder models
-        - "aya": Uses natural language instruction for Aya-style models
         - "default": Uses completion-style prompts for decoder-only models (NorMistral, Llama)
         """
         src_field = f"text_{self.source_language_code}"
@@ -102,13 +99,7 @@ class SamiNMTTask(ConfigurableTask):
         if self.prompt_style == "madlad":
             # MADLAD-400 format: <2se> for Northern Sami, <2fi> for Finnish, etc.
             return f"<2{self.target_language_code}> {src_text}"
-
-        elif self.prompt_style == "aya":
-            # Aya-101 format: Natural language instruction
-            return f"Translate to {self.target_language}: {src_text}"
-
-        else:  # Default: decoder-only (completion-style)
-            # Standard format for GPT-like models
+        else:
             out = (
                 f"{self.source_language} sentence: {src_text}\n"
                 f"{self.target_language} sentence: "
@@ -124,7 +115,7 @@ class SamiNMTTask(ConfigurableTask):
         """
         tgt_field = f"text_{self.target_language_code}"
         tgt_text = doc[tgt_field]
-        
+
         # Decoder-only models need a leading space for proper tokenization
         if self.prompt_style == "default":
             return f" {tgt_text}"
