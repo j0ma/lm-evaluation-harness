@@ -66,7 +66,7 @@ def gen_lang_yamls(output_dir: str, overwrite: bool) -> None:
                 yaml.safe_dump(
                     {
                         "include": "_saminmt_common_yaml",
-                        "task": f"saminmt_{corpus}_{lang_pair_name}",
+                        "task": f"saminmt_{corpus}_{lang_pair_name}_{prompt_style}",
                         "corpus": corpus,
                         "source_language_code": src,
                         "target_language_code": tgt,
