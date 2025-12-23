@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 # Model URI
 model_uri=${1:-$default_model_uri}
 
@@ -7,6 +9,9 @@ if [ -z "$model_uri" ]; then
     echo "Error: No model URI provided. Please provide a model URI as the first argument."
     exit 1
 fi
+
+# Optionally split model to multiple GPUs
+split_model_multiple_gpus=${split_model_multiple_gpus:-no}
 
 # Optionally enable interactive mode
 interactive_mode=${interactive_mode:-no}
@@ -42,11 +47,19 @@ else
     lang_pair=${lang_pair:-all}
 fi
 
+# Don't evaluate, just predict
+predict_only=${predict_only:-no}
+if [ "$predict_only" == "yes" ]; then
+    predict_only_flag="--predict_only"
+else
+    predict_only_flag=""
+fi
+
 # Backend type (vllm, transformers or other similar)
 backend_type=${backend_type:-vllm}
 
 # Output folder
-results_folder="./results/saminmt-llm"
+results_folder="${results_folder:-./results/saminmt-llm}"
 model_slug=${model_uri//\//__}
 model_uid=$(cut -f1 -d/ - <<<"${model_uri}")
 model_name=$(cut -f2 -d/ - <<<"${model_uri}")
@@ -55,7 +68,7 @@ slug_results_folder_onlymodel=${results_folder}/${model_name}
 
 # Log file
 temp_log_file=$(mktemp --suffix .log)
-log_file=${slug_results_folder}/eval.log
+log_file=${slug_results_folder}/eval-$(date +%s).log
 
 # Task name suffix
 # If model URI contains "madlad" then we need to append _madlad to the task name
@@ -87,6 +100,8 @@ print_settings () {
     echo "* Backend type: ${backend_type}"
     echo "* Max batch size: ${max_batch_size}"
     echo
+    echo "* Predict only: ${predict_only}"
+    echo
     echo "* Output folder: ${slug_results_folder_onlymodel}"
     echo
 }
@@ -101,29 +116,56 @@ if [ "$interactive_mode" == "yes" ]; then
     fi
 fi
 
+ngpus () {
+    echo ${CUDA_VISIBLE_DEVICES} | awk -F',' '{print NF}'
+}
+
 # Main evaluation command
 (
 
     # Log files should include the same settings info
     print_settings
 
-    lm_eval \
-        --model ${backend_type} \
-        --model_args pretrained=${model_uri},dtype=bfloat16 \
-        --tasks ${task_name} \
-        --batch_size auto \
-        --max_batch_size ${max_batch_size} \
-        --output_path ${slug_results_folder} \
-        --log_samples
+    # If there are more than 1 GPU and if the backend is hf we can
+    # use accelerate to leverage data or model parallelism
+    if [ $(ngpus) -gt 1 ] && [ "${backend_type}" == "hf" ] && [ "${split_model_multiple_gpus}" == "yes" ]; then
+        echo "Using accelerate to split model across $(ngpus) GPUs" | tee -a ${temp_log_file}
+        lm_eval \
+            --model ${backend_type} \
+            --model_args pretrained=${model_uri},dtype=bfloat16,parallelize=True \
+            --tasks ${task_name} \
+            --batch_size auto \
+            --max_batch_size ${max_batch_size} \
+            --output_path ${slug_results_folder} \
+            ${predict_only_flag} \
+            --log_samples
+    elif [ $(ngpus) -gt 1 ] && [ "${backend_type}" == "hf" ]; then
+        echo "Using accelerate for data parallelism across $(ngpus) GPUs" | tee -a ${temp_log_file}
+        accelerate launch -m lm_eval \
+            --model ${backend_type} \
+            --model_args pretrained=${model_uri},dtype=bfloat16 \
+            --tasks ${task_name} \
+            --batch_size ${max_batch_size} \
+            --output_path ${slug_results_folder} \
+            ${predict_only_flag} \
+            --log_samples
+    else
+        lm_eval \
+            --model ${backend_type} \
+            --model_args pretrained=${model_uri},dtype=bfloat16 \
+            --tasks ${task_name} \
+            --batch_size auto \
+            --max_batch_size ${max_batch_size} \
+            --output_path ${slug_results_folder} \
+            ${predict_only_flag} \
+            --log_samples
+    fi
 
 ) 2>&1 | tee -a ${temp_log_file}
 
-# Rename results folder to only include the name of the model
-echo "Renaming ${slug_results_folder} to ${slug_results_folder_onlymodel}" | tee -a ${temp_log_file}
-mv -v ${slug_results_folder} ${slug_results_folder_onlymodel} 2>&1 | tee -a ${temp_log_file}
-
-# Finally move the temp log file to the final log file location
+# Move the temp log file to the final log file location
 mv ${temp_log_file} ${log_file}
+rm ${temp_log_file}
 
 # Task groups
 # saminmt_all_default

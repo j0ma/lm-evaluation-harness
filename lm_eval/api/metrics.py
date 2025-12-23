@@ -10,8 +10,11 @@ import numpy as np
 import sacrebleu
 from evaluate import load
 
-from lm_eval.api.registry import register_aggregation, register_metric, GPU_METRIC_REGISTRY
-
+from lm_eval.api.registry import (
+    register_aggregation,
+    register_metric,
+    GPU_METRIC_REGISTRY,
+)
 
 eval_logger = logging.getLogger("lm-eval")
 
@@ -88,7 +91,12 @@ def bleu(items):
     preds = list(zip(*items))[1]
     refs, preds = _sacreformat(refs, preds)
 
-    return sacrebleu.corpus_bleu(preds, refs).score
+    try:
+        return sacrebleu.corpus_bleu(preds, refs).score
+    except (TypeError, IndexError) as e:
+        print("BLEU calculation error:", e)
+        print("Returning dummy value 0.0 for BLEU")
+        return 0.0
 
 
 @register_aggregation("chrf")
@@ -104,7 +112,13 @@ def chrf(items):
     preds = list(zip(*items))[1]
     refs, preds = _sacreformat(refs, preds)
 
-    return sacrebleu.corpus_chrf(preds, refs).score
+    try:
+        return sacrebleu.corpus_chrf(preds, refs).score
+    except (TypeError, IndexError) as e:
+        print("CHRF calculation error:", e)
+        print("Returning dummy value 0.0 for CHRF")
+        return 0.0
+
 
 @register_aggregation("comet")
 def comet(items):
@@ -114,21 +128,23 @@ def comet(items):
     sources = list(zip(*items))[0]
     refs = list(zip(*items))[1]
     hyps = list(zip(*items))[2]
-   
+
     if "comet" in GPU_METRIC_REGISTRY:
         comet_metric = GPU_METRIC_REGISTRY["comet"]
     else:
         eval_logger.info("Instantiating COMET since it was not found...")
         comet_metric = load("comet")
-        GPU_METRIC_REGISTRY['comet'] = comet_metric
-        
-    overall_score = 100*comet_metric.compute(
-        predictions=hyps,
-        references=refs,
-        sources=sources
-    )['mean_score']
+        GPU_METRIC_REGISTRY["comet"] = comet_metric
+
+    overall_score = (
+        100
+        * comet_metric.compute(predictions=hyps, references=refs, sources=sources)[
+            "mean_score"
+        ]
+    )
 
     return overall_score
+
 
 def comet_stderr(items, iters):
     """
@@ -137,27 +153,23 @@ def comet_stderr(items, iters):
     sources = list(zip(*items))[0]
     refs = list(zip(*items))[1]
     hyps = list(zip(*items))[2]
-   
+
     if "comet" in GPU_METRIC_REGISTRY:
         comet_metric = GPU_METRIC_REGISTRY["comet"]
     else:
         eval_logger.info("Instantiating COMET since it was not found...")
         comet_metric = load("comet")
-        GPU_METRIC_REGISTRY['comet'] = comet_metric
+        GPU_METRIC_REGISTRY["comet"] = comet_metric
 
-    scores = comet_metric.compute(
-        predictions=hyps,
-        references=refs,
-        sources=sources
-    )['scores']
-    scores = [100*s for s in scores]
+    scores = comet_metric.compute(predictions=hyps, references=refs, sources=sources)[
+        "scores"
+    ]
+    scores = [100 * s for s in scores]
 
     # Bootstrap
     n = len(scores)
     bootstrap_means = [
-        np.mean(np.random.choice(scores, n, replace=True))
-
-        for _ in range(iters)
+        np.mean(np.random.choice(scores, n, replace=True)) for _ in range(iters)
     ]
 
     standard_error = np.std(bootstrap_means, ddof=1)
@@ -497,6 +509,22 @@ def _sacreformat(refs, preds):
     # We expect refs to be List[str] or List[List[str]], the outer list corresponding to preds
     # Must become List[List[str]] with the inner list corresponding to preds
 
+    # Count nones among refs
+    n_nones_refs_idxs = [i for i, r in enumerate(refs) if r is None]
+    n_nones_refs = len(n_nones_refs_idxs)
+
+    n_nones_preds_idxs = [i for i, p in enumerate(preds) if p is None]
+    n_nones_preds = len(n_nones_preds_idxs)
+
+    print(
+        f"Sacrebleu formatting {len(refs)} refs, {n_nones_refs} of which are None.\n"
+        f"The None refs are at indexes: {n_nones_refs_idxs}"
+    )
+    print(
+        f"Sacrebleu formatting {len(preds)} preds, {n_nones_preds} of which are None.\n"
+        f"The None preds are at indexes: {n_nones_preds_idxs}"
+    )
+
     if not is_non_str_iterable(refs):
         refs = list(refs)
 
@@ -582,7 +610,7 @@ def stderr_for_metric(metric, bootstrap_iters: int):
         bleu,
         chrf,
         # ter,
-        comet
+        comet,
     ]
 
     if metric == comet:

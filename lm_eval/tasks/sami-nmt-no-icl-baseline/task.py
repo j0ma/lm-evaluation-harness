@@ -21,6 +21,17 @@ def code_to_language_name(lang_code: str):
     return Language.make(language=Language.get(lang_code)["language"]).display_name()
 
 
+def code_to_shortcode(lang_code: str):
+    """Converts a language code to a BCP-47 two-letter shortcode"""
+    default = Language.make(language=Language.get(lang_code)["language"]).to_tag()
+    cache = {
+        "sme": "se",  # Northern Sami
+        "fin": "fi",  # Finnish
+    }
+
+    return cache.get(lang_code, default)
+
+
 class SamiNMTTask(ConfigurableTask):
     VERSION = 0
     DATASET_NAME = "j0ma/sami-mt-data"
@@ -84,7 +95,9 @@ class SamiNMTTask(ConfigurableTask):
 
     def test_docs(self):
         # Get the test split for the appropriate corpus
-        return self.dataset[f"{self.corpus}_test"]
+        test_docs = self.dataset[f"{self.corpus}_test"]
+        print("[SamiNMTTask] Number of test documents:", len(test_docs))
+        return test_docs
 
     def doc_to_text(self, doc):
         """Format the source sentence for the model input.
@@ -98,7 +111,8 @@ class SamiNMTTask(ConfigurableTask):
 
         if self.prompt_style == "madlad":
             # MADLAD-400 format: <2se> for Northern Sami, <2fi> for Finnish, etc.
-            return f"<2{self.target_language_code}> {src_text}"
+            target_lang_shortcode = code_to_shortcode(self.target_language_code)
+            return f"<2{target_lang_shortcode}> {src_text}"
         else:
             out = (
                 f"Translate from {self.source_language} to {self.target_language}\n"
