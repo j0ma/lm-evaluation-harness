@@ -149,6 +149,16 @@ ngpus () {
             --output_path ${slug_results_folder} \
             ${predict_only_flag} \
             --log_samples
+    elif [ $(ngpus) -gt 1 ] && [ "${backend_type}" == "vllm" ]; then
+        lm_eval \
+            --model ${backend_type} \
+            --model_args pretrained=${model_uri},tensor_parallel_size=$(ngpus),dtype=auto,gpu_memory_utilization=0.8 \
+            --tasks ${task_name} \
+            --batch_size auto \
+            --max_batch_size ${max_batch_size} \
+            --output_path ${slug_results_folder} \
+            ${predict_only_flag} \
+            --log_samples
     else
         lm_eval \
             --model ${backend_type} \
