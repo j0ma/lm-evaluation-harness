@@ -139,7 +139,19 @@ ngpus () {
             --output_path ${slug_results_folder} \
             ${predict_only_flag} \
             --log_samples
+    elif [ $(ngpus) -gt 1 ] && [ "${backend_type}" == "vllm" ] && [ "${split_model_multiple_gpus}" == "yes" ]; then
+        # Case: vLLM backend, more than 1 GPU, split model to multiple gpus
+        lm_eval \
+            --model ${backend_type} \
+            --model_args pretrained=${model_uri},tensor_parallel_size=$(ngpus),dtype=auto,gpu_memory_utilization=0.8 \
+            --tasks ${task_name} \
+            --batch_size auto \
+            --max_batch_size ${max_batch_size} \
+            --output_path ${slug_results_folder} \
+            ${predict_only_flag} \
+            --log_samples
     elif [ $(ngpus) -gt 1 ] && [ "${backend_type}" == "hf" ]; then
+        # Case: HF backend, more than 1 GPU, data parallelism
         echo "Using accelerate for data parallelism across $(ngpus) GPUs" | tee -a ${temp_log_file}
         accelerate launch -m lm_eval \
             --model ${backend_type} \
@@ -150,9 +162,10 @@ ngpus () {
             ${predict_only_flag} \
             --log_samples
     elif [ $(ngpus) -gt 1 ] && [ "${backend_type}" == "vllm" ]; then
+        # Case: vLLM backend, more than 1 GPU, split model to multiple gpus
         lm_eval \
             --model ${backend_type} \
-            --model_args pretrained=${model_uri},tensor_parallel_size=$(ngpus),dtype=auto,gpu_memory_utilization=0.8 \
+            --model_args pretrained=${model_uri},data_parallel_size=$(ngpus),dtype=auto,gpu_memory_utilization=0.8 \
             --tasks ${task_name} \
             --batch_size auto \
             --max_batch_size ${max_batch_size} \
