@@ -10,6 +10,16 @@ if [ -z "$model_uri" ]; then
     exit 1
 fi
 
+# Num of fewshot examples
+num_fewshot=${num_fewshot:-0}
+
+if [ "${num_fewshot}" = 0 ]
+then
+    icl_string=""
+else
+    icl_string="_icl_K${num_fewshot}"
+fi
+
 # Optionally split model to multiple GPUs
 split_model_multiple_gpus=${split_model_multiple_gpus:-no}
 
@@ -78,7 +88,7 @@ if [[ ${model_uri} == *"madlad"* ]]; then
 else
     task_name_suffix=default
 fi
-task_name="saminmt_${corpus}_${lang_pair}_${task_name_suffix}"
+task_name="saminmt${icl_string}_${corpus}_${lang_pair}_${task_name_suffix}"
 task_name=${task_name//all_all/all}
 
 # Local server
