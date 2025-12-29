@@ -79,7 +79,7 @@ class SamiNMTTask(ConfigurableTask):
         self.dataset = downloaded_dataset
 
     def has_training_docs(self):
-        return False
+        return "uit_train" in self.dataset
 
     def has_validation_docs(self):
         return False
@@ -88,7 +88,10 @@ class SamiNMTTask(ConfigurableTask):
         return True
 
     def training_docs(self):
-        return []
+        if self.has_training_docs:
+            return self.dataset["uit_train"]
+        else:
+            return []
 
     def validation_docs(self):
         return []
