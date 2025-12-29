@@ -34,7 +34,7 @@ def code_to_shortcode(lang_code: str):
 
 class SamiNMTTask(ConfigurableTask):
     VERSION = 0
-    DATASET_NAME = "j0ma/sami-mt-data"
+    DATASET_NAME = "j0ma/sami-mt-data-withtrain"
 
     def __init__(
         self,
