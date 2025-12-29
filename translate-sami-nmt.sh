@@ -81,6 +81,14 @@ fi
 task_name="saminmt_${corpus}_${lang_pair}_${task_name_suffix}"
 task_name=${task_name//all_all/all}
 
+# Local server
+if [[ ${model_uri} == *"Ministral"* ]]; then
+    local_server="yes"
+    max_concurrent=${max_concurrent:-32}
+else
+    local_server="no"
+fi
+
 # Max batch size
 max_batch_size=${max_batch_size:-4}
 
@@ -117,7 +125,12 @@ if [ "$interactive_mode" == "yes" ]; then
 fi
 
 ngpus () {
-    echo ${CUDA_VISIBLE_DEVICES} | awk -F',' '{print NF}'
+    if [ -z "${CUDA_VISIBLE_DEVICES}" ]
+    then
+        echo 0
+    else
+        echo ${CUDA_VISIBLE_DEVICES} | awk -F',' '{print NF}'
+    fi
 }
 
 # Main evaluation command
@@ -172,6 +185,14 @@ ngpus () {
             --output_path ${slug_results_folder} \
             ${predict_only_flag} \
             --log_samples
+    elif [ "${local_server}" = "yes" ]
+    then
+        lm_eval \
+            --model local-completions \
+            --tasks ${task_name} \
+            --output_path ${slug_results_folder} \
+            --log_samples \
+            --model_args model=${model_uri},base_url=http://0.0.0.0:8000/v1/completions,num_concurrent=${max_concurrent},max_retries=3,tokenized_requests=False,tokenizer_backend=none
     else
         lm_eval \
             --model ${backend_type} \
