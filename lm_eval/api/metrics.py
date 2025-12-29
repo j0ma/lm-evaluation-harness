@@ -96,6 +96,7 @@ def bleu(items):
     except (TypeError, IndexError) as e:
         print("BLEU calculation error:", e)
         print("Returning dummy value 0.0 for BLEU")
+
         return 0.0
 
 
@@ -117,6 +118,7 @@ def chrf(items):
     except (TypeError, IndexError) as e:
         print("CHRF calculation error:", e)
         print("Returning dummy value 0.0 for CHRF")
+
         return 0.0
 
 
@@ -516,14 +518,17 @@ def _sacreformat(refs, preds):
     n_nones_preds_idxs = [i for i, p in enumerate(preds) if p is None]
     n_nones_preds = len(n_nones_preds_idxs)
 
-    print(
-        f"Sacrebleu formatting {len(refs)} refs, {n_nones_refs} of which are None.\n"
-        f"The None refs are at indexes: {n_nones_refs_idxs}"
-    )
-    print(
-        f"Sacrebleu formatting {len(preds)} preds, {n_nones_preds} of which are None.\n"
-        f"The None preds are at indexes: {n_nones_preds_idxs}"
-    )
+    if n_nones_refs > 0:
+        print(
+            f"Sacrebleu formatting {len(refs)} refs, {n_nones_refs} of which are None.\n"
+            f"The None refs are at indexes: {n_nones_refs_idxs}"
+        )
+
+    if n_nones_preds > 0:
+        print(
+            f"Sacrebleu formatting {len(preds)} preds, {n_nones_preds} of which are None.\n"
+            f"The None preds are at indexes: {n_nones_preds_idxs}"
+        )
 
     if not is_non_str_iterable(refs):
         refs = list(refs)
