@@ -100,6 +100,7 @@ class SamiNMTTaskFewShot(ConfigurableTask):
         # Get the test split for the appropriate corpus
         test_docs = self.dataset[f"{self.corpus}_test"]
         print("[SamiNMTTask] Number of test documents:", len(test_docs))
+
         return test_docs
 
     def doc_to_text(self, doc):
@@ -115,6 +116,7 @@ class SamiNMTTaskFewShot(ConfigurableTask):
         if self.prompt_style == "madlad":
             # MADLAD-400 format: <2se> for Northern Sami, <2fi> for Finnish, etc.
             target_lang_shortcode = code_to_shortcode(self.target_language_code)
+
             return f"<2{target_lang_shortcode}> {src_text}"
         else:
             out = (
@@ -122,24 +124,14 @@ class SamiNMTTaskFewShot(ConfigurableTask):
                 f"{self.source_language} sentence: {src_text}\n"
                 f"{self.target_language} sentence: "
             )
+
             return out
 
     def doc_to_target(self, doc):
-        """Return the target sentence.
-
-        For decoder-only models, we add a leading space because the prompt
-        ends with a space and we want the model to generate the actual text.
-        For encoder-decoder models (MADLAD, Aya), the target is raw.
-        """
+        """Return the target sentence."""
         tgt_field = f"text_{self.target_language_code}"
-        tgt_text = doc[tgt_field]
 
-        # Decoder-only models need a leading space for proper tokenization
-        if self.prompt_style == "default":
-            return f" {tgt_text}"
-        else:
-            # Encoder-decoder models (MADLAD, Aya)
-            return tgt_text
+        return doc[tgt_field]
 
     def should_decontaminate(self):
         return False
@@ -159,6 +151,7 @@ class SamiNMTTaskFewShot(ConfigurableTask):
 
     def aggregation(self):
         """Return aggregation functions for metrics."""
+
         return {
             "bleu": get_aggregation("bleu"),
             "chrf": get_aggregation("chrf"),
