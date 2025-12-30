@@ -5,7 +5,8 @@ Supports multiple prompt styles for different model families (MADLAD, Aya, decod
 Abstract: We consider a low-resource translation task from Finnish into Northern Sámi. Collecting all available parallel data between the languages, we obtain around 30,000 sentence pairs. However, there exists a significantly larger monolingual Northern Sámi corpus, as well as a rule-based machine translation (RBMT) system between the languages. To make the best use of the monolingual data in a neural machine translation (NMT) system, we use the backtranslation approach to create synthetic parallel data from it using both NMT and RBMT systems. Evaluating the results on an in-domain test set and a small out-of-domain set, we find that the RBMT backtranslation outperforms NMT backtranslation clearly for the out-of-domain test set, but also slightly for the in-domain data, for which the NMT backtranslation model provided clearly better BLEU scores than the RBMT. In addition, combining both backtranslated data sets improves the RBMT approach only for the in-domain test set. This suggests that the RBMT system provides general-domain knowledge that cannot be found from the relative small parallel training data.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Callable
+import re
 
 import datasets
 from langcodes import Language
@@ -103,6 +104,19 @@ class SamiNMTTaskFewShot(ConfigurableTask):
 
         return test_docs
 
+    def fewshot_context(
+            self,
+            doc: str,
+            num_fewshot: int,
+            system_instruction: Optional[str] = None,
+            apply_chat_template: bool = False,
+            fewshot_as_multiturn: bool = False,
+            chat_template: Optional[Callable] = None
+        ):
+        out = super().fewshot_context(doc, num_fewshot, system_instruction, apply_chat_template, fewshot_as_multiturn, chat_template)
+
+        return out.replace("  ", " ")
+
     def doc_to_text(self, doc):
         """Format the source sentence for the model input.
 
@@ -111,7 +125,7 @@ class SamiNMTTaskFewShot(ConfigurableTask):
         - "default": Uses completion-style prompts for decoder-only models (NorMistral, Llama)
         """
         src_field = f"text_{self.source_language_code}"
-        src_text = doc[src_field]
+        src_text = doc[src_field].strip()
 
         if self.prompt_style == "madlad":
             # MADLAD-400 format: <2se> for Northern Sami, <2fi> for Finnish, etc.
@@ -130,8 +144,9 @@ class SamiNMTTaskFewShot(ConfigurableTask):
     def doc_to_target(self, doc):
         """Return the target sentence."""
         tgt_field = f"text_{self.target_language_code}"
+        tgt_text = re.sub(r"^\s*", "", doc[tgt_field].strip())
 
-        return doc[tgt_field]
+        return tgt_text
 
     def should_decontaminate(self):
         return False
