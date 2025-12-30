@@ -73,12 +73,12 @@ results_folder="${results_folder:-./results/saminmt-llm}"
 model_slug=${model_uri//\//__}
 model_uid=$(cut -f1 -d/ - <<<"${model_uri}")
 model_name=$(cut -f2 -d/ - <<<"${model_uri}")
-slug_results_folder=${results_folder}/${model_slug}
-slug_results_folder_onlymodel=${results_folder}/${model_name}
+#slug_results_folder=${results_folder}/${model_slug}
+#slug_results_folder_onlymodel=${results_folder}/${model_name}
 
 # Log file
 temp_log_file=$(mktemp --suffix .log)
-log_file=${slug_results_folder}/eval-$(date +%s).log
+log_file=${results_folder}/${model_slug}/eval-$(date +%s).log
 
 # Task name suffix
 # If model URI contains "madlad" then we need to append _madlad to the task name
@@ -94,13 +94,23 @@ task_name=${task_name//all_all/all}
 # Local server
 if [[ ${model_uri} == *"Ministral"* ]]; then
     local_server="yes"
-    max_concurrent=${max_concurrent:-32}
 else
-    local_server="no"
+    local_server=${local_server:-no}
 fi
+max_concurrent=${max_concurrent:-32}
 
 # Max batch size
 max_batch_size=${max_batch_size:-4}
+
+# Do sample
+do_sample=${do_sample:-no}
+temperature=${temperature:-1.0}
+if [ "${do_sample}" = "yes" ]
+then
+    gen_kwargs_flag="--gen_kwargs do_sample=True,temperature=${temperature}"
+else
+    gen_kwargs_flag=""
+fi
 
 print_settings () {
     echo
@@ -117,10 +127,12 @@ print_settings () {
     echo
     echo "* Backend type: ${backend_type}"
     echo "* Max batch size: ${max_batch_size}"
+    echo "* Do sample?: ${do_sample}"
+    echo "* Temperature: ${temperature}"
     echo
     echo "* Predict only: ${predict_only}"
     echo
-    echo "* Output folder: ${slug_results_folder_onlymodel}"
+    echo "* Output folder: ${results_folder}"
     echo
 }
 
@@ -158,8 +170,9 @@ ngpus () {
             --model_args pretrained=${model_uri},dtype=bfloat16,parallelize=True \
             --tasks ${task_name} \
             --batch_size auto \
+            ${gen_kwargs_flag} \
             --max_batch_size ${max_batch_size} \
-            --output_path ${slug_results_folder} \
+            --output_path ${results_folder} \
             ${predict_only_flag} \
             --log_samples
     elif [ $(ngpus) -gt 1 ] && [ "${backend_type}" == "vllm" ] && [ "${split_model_multiple_gpus}" == "yes" ]; then
@@ -170,7 +183,7 @@ ngpus () {
             --tasks ${task_name} \
             --batch_size auto \
             --max_batch_size ${max_batch_size} \
-            --output_path ${slug_results_folder} \
+            --output_path ${results_folder} \
             ${predict_only_flag} \
             --log_samples
     elif [ $(ngpus) -gt 1 ] && [ "${backend_type}" == "hf" ]; then
@@ -181,7 +194,8 @@ ngpus () {
             --model_args pretrained=${model_uri},dtype=bfloat16 \
             --tasks ${task_name} \
             --batch_size ${max_batch_size} \
-            --output_path ${slug_results_folder} \
+            ${gen_kwargs_flag} \
+            --output_path ${results_folder} \
             ${predict_only_flag} \
             --log_samples
     elif [ $(ngpus) -gt 1 ] && [ "${backend_type}" == "vllm" ]; then
@@ -192,7 +206,7 @@ ngpus () {
             --tasks ${task_name} \
             --batch_size auto \
             --max_batch_size ${max_batch_size} \
-            --output_path ${slug_results_folder} \
+            --output_path ${results_folder} \
             ${predict_only_flag} \
             --log_samples
     elif [ "${local_server}" = "yes" ]
@@ -200,7 +214,8 @@ ngpus () {
         lm_eval \
             --model local-completions \
             --tasks ${task_name} \
-            --output_path ${slug_results_folder} \
+            ${gen_kwargs_flag} \
+            --output_path ${results_folder} \
             --log_samples \
             --model_args model=${model_uri},base_url=http://0.0.0.0:8000/v1/completions,num_concurrent=${max_concurrent},max_retries=3,tokenized_requests=False,tokenizer_backend=none
     else
@@ -210,7 +225,7 @@ ngpus () {
             --tasks ${task_name} \
             --batch_size auto \
             --max_batch_size ${max_batch_size} \
-            --output_path ${slug_results_folder} \
+            --output_path ${results_folder} \
             ${predict_only_flag} \
             --log_samples
     fi
