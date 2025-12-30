@@ -7,6 +7,7 @@ Abstract: We consider a low-resource translation task from Finnish into Northern
 
 from typing import Any, Dict, Optional, Callable
 import re
+import os
 
 import datasets
 from langcodes import Language
@@ -64,6 +65,10 @@ class SamiNMTTaskFewShot(ConfigurableTask):
         # Optional: corpus specification (uit, yle, etc.)
         self.corpus = config.pop("corpus", None)
 
+        # Num fewshot from config
+        self.num_fewshot_examples = config.pop("num_fewshot", 0)
+        print(f"[SamiNMTTaskFewShot] Num fewshot: {self.num_fewshot_examples}")
+
         super().__init__(
             config={
                 "metadata": {"version": self.VERSION},
@@ -105,15 +110,20 @@ class SamiNMTTaskFewShot(ConfigurableTask):
         return test_docs
 
     def fewshot_context(
-            self,
-            doc: str,
-            num_fewshot: int,
-            system_instruction: Optional[str] = None,
-            apply_chat_template: bool = False,
-            fewshot_as_multiturn: bool = False,
-            chat_template: Optional[Callable] = None
-        ):
-        out = super().fewshot_context(doc, num_fewshot, system_instruction, apply_chat_template, fewshot_as_multiturn, chat_template)
+        self,
+        doc: str,
+        num_fewshot: int,
+        system_instruction: Optional[str] = None,
+        apply_chat_template: bool = False,
+        fewshot_as_multiturn: bool = False,
+        chat_template: Optional[Callable] = None
+    ):
+        is os.environ.get("FEWSHOT_DEBUG_MODE") == "yes":
+            print("[SamiNMTTaskFewShot] Currently inside fewshot_context()")
+            print(f"[SamiNMTTaskFewShot] num_fewshot = {num_fewshot}")
+            print(f"[SamiNMTTaskFewShot] self.num_fewshot_examples = {self.num_fewshot_examples}")
+
+        out = super().fewshot_context(doc, self.num_fewshot_examples, system_instruction, apply_chat_template, fewshot_as_multiturn, chat_template)
 
         return out.replace("  ", " ")
 
