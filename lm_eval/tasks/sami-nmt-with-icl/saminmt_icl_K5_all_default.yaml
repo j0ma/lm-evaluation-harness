@@ -1,0 +1,8 @@
+group: saminmt_icl_K5_all_default
+task:
+  - saminmt_icl_K5_yle_fin-sme_default
+  - saminmt_icl_K5_yle_sme-fin_default
+  - saminmt_icl_K5_uit_fin-sme_default
+  - saminmt_icl_K5_uit_sme-fin_default
+metadata:
+  version: 1.0

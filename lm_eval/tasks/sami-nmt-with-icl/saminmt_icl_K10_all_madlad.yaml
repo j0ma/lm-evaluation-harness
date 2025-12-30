@@ -1,0 +1,8 @@
+group: saminmt_icl_K10_all_madlad
+task:
+  - saminmt_icl_K10_yle_fin-sme_madlad
+  - saminmt_icl_K10_yle_sme-fin_madlad
+  - saminmt_icl_K10_uit_fin-sme_madlad
+  - saminmt_icl_K10_uit_sme-fin_madlad
+metadata:
+  version: 1.0
