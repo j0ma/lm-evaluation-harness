@@ -10,6 +10,9 @@ if [ -z "$model_uri" ]; then
     exit 1
 fi
 
+# Server port
+server_port=${server_port:-8000}
+
 # Num of fewshot examples
 num_fewshot=${num_fewshot:-0}
 
@@ -111,6 +114,7 @@ then
 else
     gen_kwargs_flag=""
 fi
+
 
 print_settings () {
     echo
@@ -217,7 +221,7 @@ ngpus () {
             ${gen_kwargs_flag} \
             --output_path ${results_folder} \
             --log_samples \
-            --model_args model=${model_uri},base_url=http://0.0.0.0:8000/v1/completions,num_concurrent=${max_concurrent},max_retries=3,tokenized_requests=False,tokenizer_backend=none
+            --model_args model=${model_uri},base_url=http://0.0.0.0:${server_port}/v1/completions,num_concurrent=${max_concurrent},max_retries=5,timeout=240,tokenized_requests=False,tokenizer_backend=none
     else
         lm_eval \
             --model ${backend_type} \
