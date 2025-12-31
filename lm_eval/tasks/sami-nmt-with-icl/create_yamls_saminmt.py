@@ -71,7 +71,7 @@ def gen_lang_yamls(output_dir: str, overwrite: bool, num_fewshot: int) -> None:
                         "source_language_code": src,
                         "target_language_code": tgt,
                         "prompt_style": prompt_style,
-                        "num_fewshot": num_fewshot
+                        "num_fewshot": int(num_fewshot)
                     },
                     outfile,
                     sort_keys=False,
