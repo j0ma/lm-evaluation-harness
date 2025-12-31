@@ -19,8 +19,10 @@ num_fewshot=${num_fewshot:-0}
 if [ "${num_fewshot}" = 0 ]
 then
     icl_string=""
+    fewshot_flag="--num_fewshot ${num_fewshot}"
 else
     icl_string="_icl_K${num_fewshot}"
+    fewshot_flag=""
 fi
 
 # Optionally split model to multiple GPUs
@@ -134,6 +136,8 @@ print_settings () {
     echo "* Do sample?: ${do_sample}"
     echo "* Temperature: ${temperature}"
     echo
+    echo "* Num few shot ex.: ${num_fewshot}"
+    echo
     echo "* Predict only: ${predict_only}"
     echo
     echo "* Output folder: ${results_folder}"
@@ -175,6 +179,7 @@ ngpus () {
             --tasks ${task_name} \
             --batch_size auto \
             ${gen_kwargs_flag} \
+            ${fewshot_flag} \
             --max_batch_size ${max_batch_size} \
             --output_path ${results_folder} \
             ${predict_only_flag} \
@@ -186,6 +191,8 @@ ngpus () {
             --model_args pretrained=${model_uri},tensor_parallel_size=$(ngpus),dtype=auto,gpu_memory_utilization=0.8 \
             --tasks ${task_name} \
             --batch_size auto \
+            ${gen_kwargs_flag} \
+            ${fewshot_flag} \
             --max_batch_size ${max_batch_size} \
             --output_path ${results_folder} \
             ${predict_only_flag} \
@@ -199,11 +206,12 @@ ngpus () {
             --tasks ${task_name} \
             --batch_size ${max_batch_size} \
             ${gen_kwargs_flag} \
+            ${fewshot_flag} \
             --output_path ${results_folder} \
             ${predict_only_flag} \
             --log_samples
     elif [ $(ngpus) -gt 1 ] && [ "${backend_type}" == "vllm" ]; then
-        # Case: vLLM backend, more than 1 GPU, split model to multiple gpus
+        # Case: vLLM backend, more than 1 GPU, do data parallel
         lm_eval \
             --model ${backend_type} \
             --model_args pretrained=${model_uri},data_parallel_size=$(ngpus),dtype=auto,gpu_memory_utilization=0.8 \
@@ -211,6 +219,8 @@ ngpus () {
             --batch_size auto \
             --max_batch_size ${max_batch_size} \
             --output_path ${results_folder} \
+            ${gen_kwargs_flag} \
+            ${fewshot_flag} \
             ${predict_only_flag} \
             --log_samples
     elif [ "${local_server}" = "yes" ]
@@ -219,6 +229,7 @@ ngpus () {
             --model local-completions \
             --tasks ${task_name} \
             ${gen_kwargs_flag} \
+            ${fewshot_flag} \
             --output_path ${results_folder} \
             --log_samples \
             --model_args model=${model_uri},base_url=http://0.0.0.0:${server_port}/v1/completions,num_concurrent=${max_concurrent},max_retries=5,timeout=240,tokenized_requests=False,tokenizer_backend=none
@@ -230,6 +241,8 @@ ngpus () {
             --batch_size auto \
             --max_batch_size ${max_batch_size} \
             --output_path ${results_folder} \
+            ${gen_kwargs_flag} \
+            ${fewshot_flag} \
             ${predict_only_flag} \
             --log_samples
     fi
