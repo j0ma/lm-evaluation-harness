@@ -118,14 +118,17 @@ class SamiNMTTaskFewShot(ConfigurableTask):
         fewshot_as_multiturn: bool = False,
         chat_template: Optional[Callable] = None
     ):
-        is os.environ.get("FEWSHOT_DEBUG_MODE") == "yes":
+        if os.environ.get("FEWSHOT_DEBUG_MODE") == "yes":
             print("[SamiNMTTaskFewShot] Currently inside fewshot_context()")
             print(f"[SamiNMTTaskFewShot] num_fewshot = {num_fewshot}")
             print(f"[SamiNMTTaskFewShot] self.num_fewshot_examples = {self.num_fewshot_examples}")
 
         out = super().fewshot_context(doc, self.num_fewshot_examples, system_instruction, apply_chat_template, fewshot_as_multiturn, chat_template)
 
-        return out.replace("  ", " ")
+        out = out.replace("  ", " ")
+        out = re.sub(r"\n\s+", "\n", out)
+
+        return out
 
     def doc_to_text(self, doc):
         """Format the source sentence for the model input.
@@ -141,7 +144,10 @@ class SamiNMTTaskFewShot(ConfigurableTask):
             # MADLAD-400 format: <2se> for Northern Sami, <2fi> for Finnish, etc.
             target_lang_shortcode = code_to_shortcode(self.target_language_code)
 
-            return f"<2{target_lang_shortcode}> {src_text}"
+            out = f"<2{target_lang_shortcode}> {src_text}"
+
+            if self.num_fewshot_examples > 0:
+                out = f"{out}\n\n"
         else:
             out = (
                 f"Translate from {self.source_language} to {self.target_language}\n"
@@ -149,12 +155,15 @@ class SamiNMTTaskFewShot(ConfigurableTask):
                 f"{self.target_language} sentence: "
             )
 
-            return out
+        return out
 
     def doc_to_target(self, doc):
         """Return the target sentence."""
         tgt_field = f"text_{self.target_language_code}"
-        tgt_text = re.sub(r"^\s*", "", doc[tgt_field].strip())
+        tgt_text = re.sub(r"\n\s+", "\n", doc[tgt_field].strip())
+
+        if self.num_fewshot_examples > 0 and self.prompt_style == "madlad":
+            tgt_text = f"{tgt_text}\n\n"
 
         return tgt_text
 
