@@ -5,4 +5,4 @@ corpus: uit
 source_language_code: sme
 target_language_code: fin
 prompt_style: default
-num_fewshot: '5'
+num_fewshot: 5

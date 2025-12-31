@@ -5,4 +5,4 @@ corpus: yle
 source_language_code: sme
 target_language_code: fin
 prompt_style: madlad
-num_fewshot: '1'
+num_fewshot: 1
